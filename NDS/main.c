@@ -24,7 +24,7 @@
 
 #define GBA_DELAY() swiDelay(30)
 
-// 颜色定义（使用 libnds 的 RGB15 宏）
+// 颜色定义（使用 libnds 的 RGB15）
 #define COLOR_DARK_BG  RGB15(5, 5, 8)
 #define COLOR_WHITE    RGB15(31, 31, 31)
 
@@ -42,7 +42,7 @@ void waitForVBlankNoIrq() {
     while (REG_VCOUNT < 160);
 }
 
-// ---------- 底层 RTC 通信函数（已验证稳定） ----------
+// ---------- 底层 RTC 通信（已验证稳定）----------
 static int check_val = 0;
 
 void rtc_cmd(int v) {
@@ -95,6 +95,7 @@ int rtc_check(void) {
     return (check_val & 0x40);
 }
 
+// ⚠️ 修正版：连续读取 7 个字节，无中途操作
 void rtc_get(u8 *data) {
     int i;
     *RTC_DATA = 1; GBA_DELAY();
@@ -105,10 +106,8 @@ void rtc_get(u8 *data) {
     *RTC_DATA = 5; GBA_DELAY();
     rtc_cmd(RTC_CMD_READ(2));
     *RTC_RW = 5; GBA_DELAY();
-    for(i = 0; i < 4; i++)
-        data[i] = (u8)rtc_read();
-    *RTC_RW = 5; GBA_DELAY();
-    for(i = 4; i < 7; i++)
+    // 连续读取全部 7 个字节
+    for(i = 0; i < 7; i++)
         data[i] = (u8)rtc_read();
     *RTC_DATA = 1; GBA_DELAY();
 }
@@ -134,7 +133,7 @@ void getGameString(u8 *gametitle) {
     gametitle[12] = '\0';
 }
 
-// ---------- 界面绘制（仅优化排版间距） ----------
+// ---------- 界面绘制 ----------
 void drawMainScreen(u8 *gamename, u8 *datetime) {
     printf("\x1b[2J");
     printf("\n Real Time Clock Reader\n ----------------------------\n\n Cart: %s\n", gamename);
@@ -153,9 +152,8 @@ void drawMainScreen(u8 *gamename, u8 *datetime) {
             (check_val & 0x80) >> 7, (check_val & 0x40) >> 6, (check_val & 0x20) >> 5);
     printf(" IntME:%u  IntFE:%u\n",
             (check_val & 0x08) >> 3, (check_val & 0x02) >> 1);
-    
-    // 强制下移：跳转到第 21 行显示提示键，不再挤在中央
-    printf("\x1b[21;1H");
+    // 提示推到底部
+    printf("\n\n\n\n\n");
     printf_center("SELECT:Edit");
 }
 
@@ -176,10 +174,9 @@ void drawEditScreen(u8 *edit_datetime, int edit_pos) {
             edit_datetime[_HOUR], edit_datetime[_MIN], edit_datetime[_SEC]);
     printf("%s   %s   %s",
             (edit_pos == 4 ? "--" : "  "), (edit_pos == 5 ? "--" : "  "), (edit_pos == 6 ? "--" : "  "));
-    
-    // 强制下移：跳转到第 21 行展示保存/取消动作，改善间距
-    printf("\x1b[21;1H");
-    printf_center("START:Save    SELECT:Cancel");
+    // 操作提示推到底部
+    printf("\n\n\n\n\n\n");
+    printf("  START:Save    SELECT:Cancel");
 }
 
 // ---------- 主程序 ----------
@@ -201,7 +198,6 @@ int main() {
     u8 edit_pos = 0;
     u8 datetime[7], edit_datetime[7];
     u8 last_sec = 0xFF;
-    int frame_count = 0;
 
     // 初始界面
     printf("\n Real Time Clock Reader\n ----------------------------\n\n");
@@ -216,27 +212,29 @@ int main() {
         scanKeys();
         keys_pressed = keysDown();
 
+        // ----- 状态 -1：初始，等待 START -----
         if (gamestate == -1) {
             if (keys_pressed & KEY_START) {
                 getGameString(gamename);
                 rtc_enable();
                 rtc_get(datetime);
-                last_sec = datetime[_SEC];
+                last_sec = UNBCD(datetime[_SEC]);
                 drawMainScreen(gamename, datetime);
                 gamestate = 0;
             }
         }
+
+        // ----- 状态 0：主界面，每帧读取、秒变即刷 -----
         else if (gamestate == 0) {
-            frame_count++;
-            if (frame_count >= 10) {
-                rtc_get(datetime);
-                frame_count = 0;
-                if (datetime[_SEC] != last_sec) {
-                    last_sec = datetime[_SEC];
-                    drawMainScreen(gamename, datetime);
-                }
+            // 每帧读取 RTC
+            rtc_get(datetime);
+            u8 sec = UNBCD(datetime[_SEC]);
+            if (sec != last_sec) {
+                last_sec = sec;
+                drawMainScreen(gamename, datetime);
             }
 
+            // 按 SELECT 进入编辑（power flag 未置位）
             if ((keys_pressed & KEY_SELECT) && !(check_val & 0x80)) {
                 rtc_enable();
                 rtc_get(datetime);
@@ -254,6 +252,7 @@ int main() {
             }
         }
 
+        // ----- 状态 1：编辑界面 -----
         if (gamestate == 1 && keys_pressed) {
             if (keys_pressed & KEY_UP) {
                 switch(edit_pos) {
@@ -284,20 +283,20 @@ int main() {
                 edit_pos = (edit_pos == 0) ? 6 : edit_pos - 1;
                 drawEditScreen(edit_datetime, edit_pos);
             } else if (keys_pressed & KEY_START) {
+                // 保存并退出编辑
                 u8 bcd[7];
                 for(int i=0; i<7; i++) bcd[i] = TOBCD(edit_datetime[i]);
                 rtc_set(bcd);
                 waitForVBlankNoIrq();
                 rtc_get(datetime);
-                last_sec = datetime[_SEC];
+                last_sec = UNBCD(datetime[_SEC]);
                 gamestate = 0;
-                frame_count = 0;
                 drawMainScreen(gamename, datetime);
             } else if (keys_pressed & KEY_SELECT) {
+                // 取消编辑
                 gamestate = 0;
                 rtc_get(datetime);
-                last_sec = datetime[_SEC];
-                frame_count = 0;
+                last_sec = UNBCD(datetime[_SEC]);
                 drawMainScreen(gamename, datetime);
             }
         }
