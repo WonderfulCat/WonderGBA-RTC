@@ -2,9 +2,9 @@
 
 > **GBA Cartridge RTC Editor / GBA卡带实时时钟调节工具**
 >
-> *Developed by WonderCat* | [furlocks-forest.net](http://furlocks-forest.net)
+> *Developed by WonderCat* | [WonderGBA-RTC]([http://furlocks-forest.net](https://github.com/WonderfulCat/WonderGBA-RTC))
 
-![WonderGBA-RTC Logo](https://images.godbtech.com/images/cb60bbfdca6b4f7ca195447a1ec67ebf.png)
+![WonderGBA-RTC Logo](WonderGBA-RTC.png)
 
 ---
 
