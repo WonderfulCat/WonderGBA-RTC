@@ -32,44 +32,58 @@ void iprintf_center(const char* str) {
     iprintf("%s", str);
 }
 
-// ---------- 底层 RTC 函数（与原始稳定版相同）----------
+// ---------- 底层 RTC 函数 ----------
 void rtc_cmd(int v) {
-    int l; u16 b; v = v << 1;
+    int j, l; u16 b; v = v << 1;
     for(l = 7; l >= 0; l--) {
         b = (v >> l) & 0x2;
-        *RTC_DATA = b | 4; *RTC_DATA = b | 4; *RTC_DATA = b | 4; *RTC_DATA = b | 5;
+        for(j = 0; j < 5; j++) *RTC_DATA = b | 4; 
+        for(j = 0; j < 5; j++) *RTC_DATA = b | 5;
     }
 }
+
 void rtc_data(int v) {
-    int l; u16 b; v = v << 1;
+    int j, l; u16 b; v = v << 1;
     for(l = 0; l < 8; l++) {
         b = (v >> l) & 0x2;
-        *RTC_DATA = b | 4; *RTC_DATA = b | 4; *RTC_DATA = b | 4; *RTC_DATA = b | 5;
+        for(j = 0; j < 5; j++) *RTC_DATA = b | 4; 
+        for(j = 0; j < 5; j++) *RTC_DATA = b | 5;
     }
 }
+
 int rtc_read(void) {
     int j, l; u16 b; int v = 0;
     for(l = 0; l < 8; l++) {
-        for(j = 0; j < 5; j++) *RTC_DATA = 4;
-        *RTC_DATA = 5; b = *RTC_DATA;
+        for(j = 0; j < 8; j++) *RTC_DATA = 4;
+        *RTC_DATA = 5; 
+        for(j = 0; j < 10; j++) {
+            *RTC_DATA = 5; 
+        }
+        b = *RTC_DATA;
         v = v | ((b & 2) << l);
     }
-    return v >> 1;
+    return v >> 1; 
 }
+
 static int check_val = 0;
 void rtc_enable(void) {
     *RTC_ENABLE = 1; *RTC_DATA = 1; *RTC_DATA = 5; *RTC_RW = 7;
-    rtc_cmd(0x63); *RTC_RW = 5; check_val = rtc_read();
+    rtc_cmd(0x63); *RTC_RW = 5; 
+    for(int j = 0; j < 10; j++) __asm__("nop");
+    check_val = rtc_read();
 }
+
 int rtc_get(u8 *data) {
     int i;
     *RTC_DATA = 1; *RTC_RW = 7; *RTC_DATA = 1; *RTC_DATA = 5;
     rtc_cmd(0x65);
     *RTC_RW = 5;
-    // 连续读取 7 个字节，不再中途操作 RTC_RW
-    for(i = 0; i < 7; i++) data[i] = (u8)rtc_read();
+    for(i = 0; i < 7; i++) {
+        data[i] = (u8)rtc_read();
+    }
     return 0;
 }
+
 void rtc_set(u8 *data) {
     int i;
     *RTC_ENABLE = 1; *RTC_DATA = 1; *RTC_DATA = 5; *RTC_RW = 7;
@@ -83,30 +97,32 @@ void getGameString(u8 *gametitle) {
     gametitle[12] = '\0';
 }
 
-// ---------- 界面绘制（紧凑布局，一屏内）----------
+// ---------- 界面绘制 ----------
 void drawMainScreen(u8 *gamename, u8 *datetime) {
-    iprintf("\x1b[2J");                     // 清屏
+    iprintf("\x1b[2J");
     iprintf("\n Real Time Clock Reader\n ----------------------------\n\n Cart: %s\n", gamename);
     if (check_val & 0x80) {
         iprintf("\n !! Power flag raised !!\n Battery probably dead.\n");
     } else {
-        iprintf("\n Date (dd/mm/yyyy)\n");
+        // 🌟 按照要求：在 Date (dd/mm/yyyy) 和具体数字之间加了一个空行 \n
+        iprintf("\n Date (dd/mm/yyyy)\n\n");
         iprintf("  %02d / %02d / 20%02d  wkd: %d\n",
-                UNBCD(datetime[2] & 0x3F), UNBCD(datetime[1]), UNBCD(datetime[0]), UNBCD(datetime[3]));
-        iprintf("\n Time (hh:mm:ss)\n");
+                UNBCD(datetime[2] & 0x3F), UNBCD(datetime[1]), UNBCD(datetime[0] & 0xFF), UNBCD(datetime[3]));
+        // 🌟 按照要求：在 Time (hh:mm:ss) 和具体数字之间加了一个空行 \n
+        iprintf("\n Time (hh:mm:ss)\n\n");
         iprintf("  %02d : %02d : %02d\n",
-                UNBCD(datetime[4] & 0x3F), UNBCD(datetime[5]), UNBCD(datetime[6]));
+                UNBCD(datetime[4] & 0x3F), UNBCD(datetime[5] & 0x7F), UNBCD(datetime[6] & 0x7F));
     }
     iprintf("\n Power:%u  12/24:%u  IntAE:%u\n", (check_val & 0x80) >> 7, (check_val & 0x40) >> 6, (check_val & 0x20) >> 5);
     iprintf(" IntME:%u  IntFE:%u\n", (check_val & 0x08) >> 3, (check_val & 0x02) >> 1);
-    // 留少量空行，提示在底部
     iprintf("\n\n\n");
     iprintf_center("SELECT:Edit");
 }
 
 void drawEditScreen(u8 *edit_datetime, int edit_pos) {
     iprintf("\x1b[2J");
-    iprintf("\n Edit Real-Time Clock\n ----------------------------\n\n Date (dd/mm/yyyy)\n");
+    // 🌟 按照要求：编辑界面也同步在 Date 标题与数字间加了空行 \n
+    iprintf("\n Edit Real-Time Clock\n ----------------------------\n\n Date (dd/mm/yyyy)\n\n");
     iprintf("  %s   %s     %s       %s\n",
             (edit_pos == 0 ? "--" : "  "), (edit_pos == 1 ? "--" : "  "),
             (edit_pos == 2 ? "--" : "  "), (edit_pos == 3 ? "-" : " "));
@@ -115,14 +131,14 @@ void drawEditScreen(u8 *edit_datetime, int edit_pos) {
     iprintf("  %s   %s     %s       %s\n",
             (edit_pos == 0 ? "--" : "  "), (edit_pos == 1 ? "--" : "  "),
             (edit_pos == 2 ? "--" : "  "), (edit_pos == 3 ? "-" : " "));
-    iprintf("\n Time (hh:mm:ss)\n");
+    // 🌟 按照要求：编辑界面也同步在 Time 标题与数字间加了空行 \n
+    iprintf("\n Time (hh:mm:ss)\n\n");
     iprintf("  %s   %s   %s\n",
             (edit_pos == 4 ? "--" : "  "), (edit_pos == 5 ? "--" : "  "), (edit_pos == 6 ? "--" : "  "));
     iprintf("  %02d : %02d : %02d\n",
             edit_datetime[_HOUR], edit_datetime[_MIN], edit_datetime[_SEC]);
     iprintf("  %s   %s   %s\n",
             (edit_pos == 4 ? "--" : "  "), (edit_pos == 5 ? "--" : "  "), (edit_pos == 6 ? "--" : "  "));
-    // 操作提示靠近底部
     iprintf("\n\n\n\n");
     iprintf("  START:Save    SELECT:Cancel");
 }
@@ -144,11 +160,11 @@ int main() {
     BG_PALETTE[0] = COLOR_DARK_BG;
     BG_PALETTE[1] = COLOR_WHITE;
 
-    // 初始提示（一屏内）
     iprintf("\n Real Time Clock Reader\n ----------------------------\n\n 1. Remove Flash Cart\n 2. Insert PKMN R/S/E Cart\n 3. Press START");
     iprintf("\n\n\n\n\n\n\n\n\n");
     iprintf_center("Developed by WonderCat\n");
-    iprintf_center("http://furlocks-forest.net");
+	iprintf("\n");
+    iprintf_center("github.com/WonderfulCat");
 
     while(1) {
         VBlankIntrWait();
@@ -157,17 +173,27 @@ int main() {
 
         if (gamestate == -1) {
             if (keys_pressed & KEY_START) {
+                for (int i = 0; i < 30; i++) VBlankIntrWait();
+
+                for (int i = 0; i < 16; i++) {
+                    *RTC_ENABLE = 1; 
+                    *RTC_DATA = 1; 
+                    *RTC_DATA = 5; 
+                    *RTC_RW = 7;
+                }
+
                 getGameString(gamename);
                 rtc_enable();
                 rtc_get(datetime);
                 last_sec = datetime[_SEC];
+                
                 drawMainScreen(gamename, datetime);
                 gamestate = 0;
             }
         }
         else if (gamestate == 0) {
             frame_count++;
-            if (frame_count >= 10) {          // 约 166ms 读一次，够用且不闪
+            if (frame_count >= 10) {          
                 rtc_get(datetime);
                 frame_count = 0;
                 if (datetime[_SEC] != last_sec) {
@@ -183,7 +209,7 @@ int main() {
                 edit_datetime[_SEC]  = UNBCD(datetime[_SEC]);
                 edit_datetime[_DAY]  = UNBCD(datetime[_DAY] & 0x3F);
                 edit_datetime[_MONTH]= UNBCD(datetime[_MONTH]);
-                edit_datetime[_YEAR] = UNBCD(datetime[_YEAR]);
+                edit_datetime[_YEAR] = UNBCD(datetime[_YEAR] & 0xFF);
                 edit_datetime[_WKD]  = UNBCD(datetime[_WKD]);
                 gamestate = 1;
                 edit_pos = 0;
