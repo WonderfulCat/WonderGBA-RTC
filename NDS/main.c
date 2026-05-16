@@ -205,7 +205,8 @@ int main() {
     printf(" 2. Press START\n");
     printf("\n\n\n\n\n\n\n\n\n\n\n");
     printf_center("Developed by WonderCat\n");
-    printf_center("http://furlocks-forest.net");
+	printf("\n");
+    printf_center("github.com/WonderfulCat");
 
     while(1) {
         waitForVBlankNoIrq();
