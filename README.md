@@ -29,7 +29,7 @@ This tool was specifically developed to resolve synchronization issues found in 
 
 ## ⚠️ 免责声明 / Disclaimer
 
-* **中文：** 本程序目前**仅在作者个人的定制卡带（搭载 STM32 芯片的自制卡带）上进行了完整的硬件测试**。由于市面上各类自制卡、改版卡及烧录卡的硬件设计、总线驱动能力和电平特性各不相同，**本工具对其他卡带的兼容性完全未知**。因使用本工具导致卡带数据丢失、硬件损坏或芯片死锁等任何不良后果，作者概不承担任何责任。请在测试前自行备份存档。
+* **中文：** 本程序目前**仅在作者个人的定制卡带上进行了完整的硬件测试**。由于市面上各类自制卡、改版卡及烧录卡的硬件设计、总线驱动能力和电平特性各不相同，**本工具对其他卡带的兼容性完全未知**。因使用本工具导致卡带数据丢失、硬件损坏或芯片死锁等任何不良后果，作者概不承担任何责任。请在测试前自行备份存档。
 * **English:** This software has **only been verified and tested on the author's own custom cartridges (custom flashcarts powered by STM32 microcontrollers)**. Due to variances in hardware design, bus drive capabilities, and voltage level characteristics across different custom carts or flashcarts on the market, **compatibility with other third-party hardware is completely unknown**. The author assumes no responsibility for any data loss, hardware damage, or chip bricking caused by using this tool. Use it at your own risk.
 
 ---
