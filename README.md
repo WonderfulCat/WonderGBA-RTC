@@ -10,7 +10,7 @@
 
 ## 📝 项目简介 / Introduction
 
-### 一句话简介 / Short Description
+### 简介 / Short Description
 * **中文：** 一款专为 GBA 自制卡带打造的 RTC（实时时钟）读写与调节工具，支持 GBA 和 NDS 双端运行。
 * **English:** A GBA and NDS homebrew tool designed to read, write, and calibrate Real-Time Clocks (RTC) on custom GBA cartridges.
 
